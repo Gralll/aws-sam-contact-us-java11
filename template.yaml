@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  contact-us-sam-app
+Globals:
+  Function:
+    Timeout: 15
+  Api:
+    Cors:
+      AllowOrigin: "'*'"
+      AllowHeaders: "'Content-Type,X-WARM-UP,X-Amz-Date,Authorization,X-Api-Key'"
+
+Resources:
+  ContactUsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: contact-us-function
+      Handler: com.gralll.sam.App::handleRequest
+      Runtime: java11
+      MemorySize: 256
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: Canary10Percent10Minutes
+      Environment:
+        Variables:
+          SENDER_EMAIL: 'aleksandrgruzdev11@gmail.com'
+          RECIPIENT_EMAIL: 'aleksandrgruzdev11@gmail.com'
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: 'arn:aws:ses:eu-west-1:548476639829:identity/aleksandrgruzdev11@gmail.com'
+            - Effect: Allow
+              Action:
+                - dynamodb:List*
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - dynamodb:Get*
+                - dynamodb:PutItem
+                - dynamodb:DescribeTable
+              Resource: 'arn:aws:dynamodb:*:*:table/ContactUsTable'
+      Events:
+        ContactUs:
+          Type: Api
+          Properties:
+            Path: /contact
+            Method: post
+
+  ContactUsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: Id
+        Type: String
+      TableName: ContactUsTable
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+
+Outputs:
+  ContactUsApi:
+    Description: "API Gateway endpoint URL for Prod stage for ContactUs function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/contact/"
+  ContactUsFunction:
+    Description: "ContactUs Lambda Function ARN"
+    Value: !GetAtt ContactUsFunction.Arn
+  ContactUsFunctionIamRole:
+    Description: "Implicit IAM Role created for ContactUs function"
+    Value: !GetAtt ContactUsFunctionRole.Arn

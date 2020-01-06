@@ -1,0 +1,15 @@
+// Init project
+sam init
+
+// Deploy the project
+sam build
+sam package --output-template-file packaged.yaml --s3-bucket contact-us-sam-app
+sam deploy --template-file packaged.yaml --region eu-west-1 --capabilities CAPABILITY_IAM --stack-name contact-us-sam-app
+
+// Local invoking
+sam local invoke -e ./events/warm_up_request.json ContactUsFunction
+sam local invoke -e ./events/contact_us_request.json ContactUsFunction
+sam local start-api
+
+// Getting logs
+sam logs --name ContactUsFunction --stack-name contact-us-sam-app

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+            integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+            crossorigin="anonymous"></script>
+    <script>
+        function setDefault(e) {
+            e.preventDefault();
+            $("#url-input").val("https://4ykskscuq0.execute-api.eu-west-1.amazonaws.com/Prod/contact");
+            $("#name-input").val("Mike");
+            $("#email-input").val("Mike@somemail.com");
+            $("#phone-input").val("+79999999999");
+            $("#description-input").val("How much does it cost?");
+        };
+
+        function clearDefault(e) {
+            e.preventDefault();
+            $("#url-input").val(null);
+            $("#name-input").val(null);
+            $("#email-input").val(null);
+            $("#phone-input").val(null);
+            $("#description-input").val(null);
+        };
+
+        function turnMode(e) {
+            e.preventDefault();
+            if (!$("#lambda-mode").hasClass('warm-up-mode')) {
+                $("#lambda-mode").addClass('warm-up-mode')
+                $("#lambda-mode").html('WarmUp mode ON')
+            } else {
+                $("#lambda-mode").removeClass('warm-up-mode')
+                $("#lambda-mode").html('WarmUp mode OFF')
+            }
+        };
+    </script>
+    <script>
+        function submitToAPI(e) {
+            e.preventDefault();
+            if ($("#url-input").val() == "") {
+                alert("Please enter your service API URL");
+                return;
+            }
+            var Namere = /[A-Za-z]{1}[A-Za-z]/;
+            if (!Namere.test($("#name-input").val())) {
+                alert("Name can not less than 2 char");
+                return;
+            }
+            var mobilere = /[0-9]{10}/;
+            if (!mobilere.test($("#phone-input").val())) {
+                alert("Please enter valid mobile number");
+                return;
+            }
+            if ($("#email-input").val() == "") {
+                alert("Please enter your email id");
+                return;
+            }
+            var reeamil = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,6})?$/;
+            if (!reeamil.test($("#email-input").val())) {
+                alert("Please enter valid email address");
+                return;
+            }
+
+            var name = $("#name-input").val();
+            var phone = $("#phone-input").val();
+            var email = $("#email-input").val();
+            var question = $("#description-input").val();
+            var URL = $("#url-input").val();
+            var data = {
+                subject: "Question",
+                username: name,
+                phone: phone,
+                email: email,
+                question: question
+            };
+
+            var requestHeaders;
+            if ($("#lambda-mode").hasClass('warm-up-mode')) {
+                requestHeaders = {
+                    'X-WARM-UP': '123'
+                }
+            } else {
+                requestHeaders = {}
+            }
+            $.ajax({
+                type: "POST",
+                headers: requestHeaders,
+                url: URL,
+                dataType: "json",
+                crossDomain: "true",
+                data: JSON.stringify(data),
+
+                success: function (response) {
+                    alert("Successful: " + response.response);
+                    document.getElementById("contact-form").reset();
+                    location.reload();
+                },
+                error: function (xhr) {
+                    alert("Unseccessful. Status: " + xhr.status + " Message: " + xhr.responseText);
+                }
+            });
+        }
+    </script>
+    <style>
+
+        form {
+            width: 30%;
+            margin: auto;
+            border: 2px solid black;
+            border-radius: 4px;
+            padding: 12px 20px;
+        }
+
+        #service-url {
+            width: 30%;
+            margin: auto;
+        }
+
+        #form-name {
+            width: 30%;
+            margin: auto;
+        }
+
+        .flex-right {
+            display: flex;
+            align-items: flex-end;
+            flex-direction: column;
+        }
+
+        .warm-up-mode {
+            background-color: #e14953;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="service-url" class="flex-right">
+    <div style="width: 100%;">
+        <h4>URL (Just for debug):</h4>
+        <input type="text" style="height:35px;" id="url-input" placeholder="Enter service URL..." class="form-control"/>
+    </div>
+    </br>
+    <div>
+        <button type="button" id="lambda-mode" onClick="turnMode(event)" class="btn btn-lg">WarmUp mode off</button>
+        <button type="button" onClick="setDefault(event)" class="btn btn-lg" style="">Set default</button>
+        <button type="button" onClick="clearDefault(event)" class="btn btn-lg">Clear all</button>
+    </div>
+</div>
+
+<hr align="center" width="800" size="10" color="#000000"/>
+
+<div id="form-name" style=""><h2>Contact Us</h2></div>
+
+<form id="contact-form" method="post">
+    <div class="form-group">
+        <h4>Name:</h4>
+        <input type="text" style="height:35px;" id="name-input" placeholder="Please enter your name here..." class="form-control"
+               style="width:100%;"/><br/>
+    </div>
+    <div class="form-group">
+        <h4>Phone:</h4>
+        <input type="phone" style="height:35px;" id="phone-input" placeholder="Please enter your phone number here..." class="form-control"
+               style="width:100%;"/><br/>
+    </div>
+    <div class="form-group">
+        <h4>Email:</h4>
+        <input type="email" style="height:35px;" id="email-input" placeholder="Please enter your enter email here..." class="form-control"
+               style="width:100%;"/><br/>
+    </div>
+    <div class="form-group">
+        <h4>How can we help you?</h4>
+        <textarea id="description-input" rows="3" placeholder="Please ask your question here..." class="form-control"
+                  style="width:100%;"></textarea><br/>
+    </div>
+    <div class="flex-right">
+        <button type="button" onClick="submitToAPI(event)" class="btn btn-lg">Send</button>
+    </div>
+</form>
+</body>
+</html>
