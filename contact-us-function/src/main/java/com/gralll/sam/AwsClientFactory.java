@@ -10,7 +10,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * Just util class for eager initialization of sdk clients.
+ * Just an util class for an eager initialization of sdk clients.
  */
 public class AwsClientFactory {
 
