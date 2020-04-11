@@ -1,33 +1,24 @@
 package com.gralll.sam;
 
 import com.amazonaws.serverless.proxy.model.AwsProxyRequest;
-import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.simpleemail.model.Body;
-import com.amazonaws.services.simpleemail.model.Content;
-import com.amazonaws.services.simpleemail.model.Destination;
-import com.amazonaws.services.simpleemail.model.Message;
-import com.amazonaws.services.simpleemail.model.SendEmailRequest;
-import com.amazonaws.services.simpleemail.model.SendEmailResult;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gralll.sam.exception.ContactUsLambdaClientException;
 import com.gralll.sam.model.ContactUsProxyResponse;
-import com.gralll.sam.model.ContactUsProxyResponse.ContactUsResponseBody;
 import com.gralll.sam.model.ContactUsRequest;
-import org.apache.commons.io.IOUtils;
-import org.apache.http.entity.ContentType;
+import com.gralll.sam.service.AwsClientFactory;
+import com.gralll.sam.service.DbService;
+import com.gralll.sam.service.EmailService;
+import com.gralll.sam.service.PropertyStorage;
+import com.gralll.sam.service.RequestService;
+import com.gralll.sam.service.ResponseService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.lang.Boolean.FALSE;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.http.HttpHeaders.CONTENT_TYPE;
 
 /**
  * Request ad response types can be Input and Output stream or any custom objects.
@@ -37,8 +28,13 @@ import static org.apache.http.HttpHeaders.CONTENT_TYPE;
 public class App implements RequestHandler<AwsProxyRequest, ContactUsProxyResponse> {
 
     // Use static variables to keep a context between executions
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final AwsClientFactory AWS_CLIENT_FACTORY = new AwsClientFactory();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AwsClientFactory awsClientFactory = new AwsClientFactory();
+    private final EmailService emailService = new EmailService(awsClientFactory.getSesClient());
+    private final DbService dbService = new DbService(awsClientFactory.getDynamoDB());
+    private final ResponseService responseService = new ResponseService(objectMapper);
+    private final RequestService requestService = new RequestService(objectMapper);
+    private final PropertyStorage propertyStorage = new PropertyStorage();
 
     // Use custom logger or logger from a Lambda context by
     // calling context.getLogger()
@@ -55,114 +51,56 @@ public class App implements RequestHandler<AwsProxyRequest, ContactUsProxyRespon
      */
     @Override
     public ContactUsProxyResponse handleRequest(AwsProxyRequest request, Context context) {
-
-        LOG.info("Request was received");
-        LOG.debug(getAsPrettyString(request));
-
-        // WARMING UP
-        // Allows to load a classpath and initialize all static fields for next executions
-        // to improve performance
-        if (Optional.ofNullable(request.getMultiValueHeaders()).map(headers -> headers.containsKey("X-WARM-UP")).orElse(FALSE)) {
-            LOG.info("Lambda was warmed up");
-            return buildResponse(201, "Lambda was warmed up. V1");
-        }
-
-        ContactUsRequest contactUsRequest = getContactUsRequest(request);
-
-        SendEmailResult sendEmailResult = sendEmail(contactUsRequest);
-        LOG.info("Email was sent");
-
-        addEmailDetailsToDb(contactUsRequest, sendEmailResult);
-        LOG.info("DB is updated");
-
-        return buildResponse(200,
-                String.format("Message %s has been sent successfully.", sendEmailResult.getMessageId()));
-    }
-
-    private void addEmailDetailsToDb(ContactUsRequest contactUsRequest, SendEmailResult sendEmailResult) {
-        AWS_CLIENT_FACTORY.getDynamoDB().getTable("ContactUsTable")
-                          .putItem(new Item()
-                                  .withPrimaryKey("Id", sendEmailResult.getMessageId())
-                                  .withString("Subject", contactUsRequest.getSubject())
-                                  .withString("Username", contactUsRequest.getUsername())
-                                  .withString("Phone", contactUsRequest.getPhone())
-                                  .withString("Email", contactUsRequest.getEmail())
-                                  .withString("Question", contactUsRequest.getQuestion()));
-    }
-
-    private String fillTemplate(String emailTemplate, ContactUsRequest contactUsRequest) {
-        return String.format(
-                emailTemplate,
-                contactUsRequest.getUsername(),
-                contactUsRequest.getEmail(),
-                contactUsRequest.getPhone(),
-                contactUsRequest.getQuestion());
-    }
-
-    private SendEmailResult sendEmail(ContactUsRequest contactUsRequest) {
-        String emailTemplate = getEmailTemplate();
-        String email = fillTemplate(emailTemplate, contactUsRequest);
-
-        SendEmailRequest sendEmailRequest =
-                new SendEmailRequest(
-                        System.getenv("SENDER_EMAIL"),
-                        new Destination(List.of(System.getenv("RECIPIENT_EMAIL"))),
-                        new Message()
-                                .withSubject(
-                                        new Content()
-                                                .withCharset(UTF_8.name())
-                                                .withData(contactUsRequest.getSubject()))
-                                .withBody(new Body()
-                                        .withHtml(new Content()
-                                                .withCharset(UTF_8.name())
-                                                .withData(email))));
-        LOG.info("Email template is ready");
-        return AWS_CLIENT_FACTORY.getSesClient().sendEmail(sendEmailRequest);
-    }
-
-    private ContactUsProxyResponse buildResponse(int statusCode, String body) {
-        ContactUsProxyResponse awsProxyResponse =
-                new ContactUsProxyResponse();
-        awsProxyResponse.setStatusCode(statusCode);
-        awsProxyResponse.setBody(getBodyAsString(body));
-        awsProxyResponse.addHeader(CONTENT_TYPE, ContentType.APPLICATION_JSON.toString());
-        awsProxyResponse.addHeader("Access-Control-Allow-Origin", "*");
-        return awsProxyResponse;
-    }
-
-    private String getBodyAsString(String body) {
         try {
-            return OBJECT_MAPPER.writeValueAsString(new ContactUsResponseBody(body));
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Writing ContactUsResponseBody as string failed.", e);
+            LOG.info("Request received.");
+            LOG.debug(requestService.getAsPrettyString(request));
+
+            return isWarmUpRequest(request)
+                    ? handleWarmUpRequest()
+                    : handleRealRequest(request);
+        } catch (ContactUsLambdaClientException e) {
+            LOG.error("Request was not handled due to a client error.", e);
+            return responseService.buildResponse(400, "Client error.");
+        } catch (Exception e) {
+            LOG.error("Request was not handled due to a server error.", e);
+            return responseService.buildResponse(500, "Server error.");
         }
     }
 
-    private String getEmailTemplate() {
-        try {
-            return IOUtils.toString(
-                    Objects.requireNonNull(this.getClass().getClassLoader()
-                                               .getResourceAsStream("email_template.html")),
-                    UTF_8);
-        } catch (IOException e) {
-            throw new RuntimeException("Loading an email template failed.", e);
-        }
+    private ContactUsProxyResponse handleRealRequest(AwsProxyRequest request) {
+        // Parsing an input request
+        ContactUsRequest contactUsRequest = requestService.getContactUsRequest(request);
+
+        // Sending email to an agent
+        String messageId = emailService.sendEmail(
+                propertyStorage.getValue("SENDER_EMAIL"),
+                propertyStorage.getValue("RECIPIENT_EMAIL"),
+                contactUsRequest);
+        LOG.info("ContactUs email message has been sent successfully.");
+
+        // Saving request to DB
+        dbService.putContactUsRequest(messageId, contactUsRequest);
+        LOG.info("ContactUsRequest has been written to DB.");
+
+        return responseService.buildResponse(200,
+                String.format("Message %s has been sent successfully.", messageId));
     }
 
-    private ContactUsRequest getContactUsRequest(AwsProxyRequest request) {
-        try {
-            return OBJECT_MAPPER.readValue(request.getBody(), ContactUsRequest.class);
-        } catch (IOException e) {
-            throw new RuntimeException("ContactUsRequest deserialization failed.", e);
-        }
+    private Boolean isWarmUpRequest(AwsProxyRequest request) {
+        return Optional.ofNullable(request.getMultiValueHeaders())
+                       .map(headers -> headers.containsKey("X-WARM-UP"))
+                       .orElse(FALSE);
     }
 
-    private String getAsPrettyString(AwsProxyRequest request) {
-        try {
-            return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(request);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Writing AwsProxyRequest as string failed.", e);
-        }
+    /**
+     * Just to load a classpath and initialize all static fields for next calls.
+     * Skips real AWS connections.
+     *
+     * @return Stub response
+     */
+    private ContactUsProxyResponse handleWarmUpRequest() {
+        LOG.info("Lambda was warmed up.");
+        return responseService.buildWarmUpResponse();
     }
 
 }

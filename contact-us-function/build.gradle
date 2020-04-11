@@ -12,12 +12,16 @@ repositories {
     mavenCentral()
 }
 
+test {
+    jvmArgs '--add-opens=java.base/jdk.internal.util=ALL-UNNAMED', '--add-opens=java.xml/jdk.xml.internal=ALL-UNNAMED'
+}
+
 dependencies {
     // AWS
     implementation group: 'com.amazonaws.serverless', name: 'aws-serverless-java-container-core', version: '1.4'
     implementation group: 'com.amazonaws', name: 'aws-lambda-java-core', version: '1.2.0'
-    implementation group: 'com.amazonaws', name: 'aws-java-sdk-ses', version: '1.11.670'
-    implementation group: 'com.amazonaws', name: 'aws-java-sdk-dynamodb', version: '1.11.670'
+    implementation group: 'com.amazonaws', name: 'aws-java-sdk-ses', version: '1.11.759'
+    implementation group: 'com.amazonaws', name: 'aws-java-sdk-dynamodb', version: '1.11.759'
     implementation group: 'com.amazonaws', name: 'aws-lambda-java-log4j2', version: '1.1.0'
 
     // Utils
@@ -26,7 +30,10 @@ dependencies {
 
     // Test
     testImplementation group: 'junit', name: 'junit', version: '4.12'
-    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.1.0'
-    testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.4'
-    testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.4'
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.3.3'
+    testImplementation group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.6'
+    testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.6'
+    testImplementation group: 'org.testcontainers', name: 'localstack', version: '1.13.0'
+    testImplementation group: 'cloud.localstack', name: 'localstack-utils', version: '0.2.1'
+
 }

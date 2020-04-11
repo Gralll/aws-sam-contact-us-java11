@@ -2,45 +2,36 @@ package com.gralll.sam.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
+/**
+ * Just a copy of aws-sdk response, but with a fixed 'is' field
+ */
 public class ContactUsProxyResponse {
 
-    private int statusCode;
-    private Map<String, String> headers;
-    private String body;
-    private boolean isBase64Encoded;
+    private final int statusCode;
+    private final Map<String, String> headers;
+    private final String body;
+    private final boolean isBase64Encoded;
 
-    public void addHeader(String key, String value) {
-        if (this.headers == null) {
-            this.headers = new HashMap<>();
-        }
-        this.headers.put(key, value);
+    public ContactUsProxyResponse(int statusCode, Map<String, String> headers, String body) {
+        this.statusCode = statusCode;
+        this.headers = headers;
+        this.body = body;
+        this.isBase64Encoded = false;
     }
 
     public int getStatusCode() {
         return statusCode;
     }
 
-    public void setStatusCode(int statusCode) {
-        this.statusCode = statusCode;
-    }
-
     public Map<String, String> getHeaders() {
         return headers;
     }
 
-    public void setHeaders(Map<String, String> headers) {
-        this.headers = headers;
-    }
-
     public String getBody() {
         return body;
-    }
-
-    public void setBody(String body) {
-        this.body = body;
     }
 
     @JsonProperty("isBase64Encoded")
@@ -48,23 +39,19 @@ public class ContactUsProxyResponse {
         return isBase64Encoded;
     }
 
-    public void setBase64Encoded(boolean base64Encoded) {
-        isBase64Encoded = base64Encoded;
+    @Override public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        ContactUsProxyResponse that = (ContactUsProxyResponse) o;
+        return statusCode == that.statusCode &&
+                isBase64Encoded == that.isBase64Encoded &&
+                Objects.equals(headers, that.headers) &&
+                Objects.equals(body, that.body);
     }
 
-    public static class ContactUsResponseBody {
-        private String response;
-
-        public ContactUsResponseBody(String response) {
-            this.response = response;
-        }
-
-        public String getResponse() {
-            return response;
-        }
-
-        public void setResponse(String response) {
-            this.response = response;
-        }
+    @Override public int hashCode() {
+        return Objects.hash(statusCode, headers, body, isBase64Encoded);
     }
 }

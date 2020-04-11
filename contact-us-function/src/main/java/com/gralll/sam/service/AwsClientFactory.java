@@ -1,4 +1,4 @@
-package com.gralll.sam;
+package com.gralll.sam.service;
 
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
@@ -22,18 +22,18 @@ public class AwsClientFactory {
     /**
      * AWS regions should be env variables if you want to generalize the solution.
      */
-    AwsClientFactory() {
+    public AwsClientFactory() {
         LOG.debug("AWS clients factory initialization.");
         sesClient = AmazonSimpleEmailServiceClient.builder().withRegion(Regions.EU_WEST_1).build();
         AmazonDynamoDB dynamoDBClient = AmazonDynamoDBClientBuilder.standard().withRegion(Regions.EU_WEST_1).build();
         dynamoDB = new DynamoDB(dynamoDBClient);
     }
 
-    DynamoDB getDynamoDB() {
+    public DynamoDB getDynamoDB() {
         return dynamoDB;
     }
 
-    AmazonSimpleEmailService getSesClient() {
+    public AmazonSimpleEmailService getSesClient() {
         return sesClient;
     }
 

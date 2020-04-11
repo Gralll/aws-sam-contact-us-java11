@@ -7,6 +7,17 @@ public class ContactUsRequest {
     private String email;
     private String question;
 
+    public ContactUsRequest() {
+    }
+
+    public ContactUsRequest(String subject, String username, String phone, String email, String question) {
+        this.subject = subject;
+        this.username = username;
+        this.phone = phone;
+        this.email = email;
+        this.question = question;
+    }
+
     public String getSubject() {
         return subject;
     }
